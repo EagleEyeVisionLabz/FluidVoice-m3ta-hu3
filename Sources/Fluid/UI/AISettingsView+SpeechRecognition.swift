@@ -322,6 +322,41 @@ extension VoiceEngineSettingsView {
                 )
             }
 
+            if model == .nemotronOffline || model == .nemotronStreaming || model == .nemotronStreaming320 {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: "globe")
+                            .font(.caption)
+                            .foregroundStyle(self.theme.palette.accent)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Select Language")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("Choose Auto mode or select a manual language from the list.")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        self.nemotronLanguagePickerButton
+                            .disabled(self.viewModel.asr.isRunning)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(self.theme.palette.accent.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(self.theme.palette.accent.opacity(0.20), lineWidth: 1)
+                        )
+                )
+            }
+
             if supportsCustomWords {
                 HStack(alignment: .center, spacing: 10) {
                     Image(systemName: "checkmark.seal.fill")
@@ -378,7 +413,7 @@ extension VoiceEngineSettingsView {
                 Text(model.humanReadableName)
                     .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? self.theme.palette.primaryText : .secondary)
-                Text(model.displayName)
+                Text(self.speechModelSubtitle(for: model))
                     .font(.caption)
                     .foregroundStyle(.secondary.opacity(0.7))
 
@@ -567,6 +602,75 @@ extension VoiceEngineSettingsView {
         }
         .opacity(self.viewModel.asr.isRunning ? 0.6 : 1.0)
         .allowsHitTesting(!self.viewModel.asr.isRunning)
+    }
+
+    private func speechModelSubtitle(for model: SettingsStore.SpeechModel) -> String {
+        switch model {
+        case .nemotronStreaming, .nemotronStreaming320:
+            return "Nemotron Speech 3.5 - Streaming Capable"
+        default:
+            return model.displayName
+        }
+    }
+
+    private var nemotronLanguagePickerButton: some View {
+        Button {
+            self.isShowingNemotronLanguagePicker.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(self.settings.selectedNemotronLanguage.displayName)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(self.theme.palette.cardBackground.opacity(0.9))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(self.theme.palette.cardBorder.opacity(0.6), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: self.$isShowingNemotronLanguagePicker, arrowEdge: .bottom) {
+            self.nemotronLanguagePickerPopover
+        }
+    }
+
+    private var nemotronLanguagePickerPopover: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(SettingsStore.NemotronLanguage.allCases) { language in
+                    Button {
+                        self.settings.selectedNemotronLanguage = language
+                        self.isShowingNemotronLanguagePicker = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(language.displayName)
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                            Spacer(minLength: 12)
+                            if language == self.settings.selectedNemotronLanguage {
+                                Image(systemName: "checkmark")
+                                    .font(.caption)
+                                    .foregroundStyle(self.theme.palette.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.horizontal, 12)
+                        .frame(height: 26)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 6)
+        }
+        .frame(width: 260, height: 532)
     }
 
     var modelStatusView: some View {
