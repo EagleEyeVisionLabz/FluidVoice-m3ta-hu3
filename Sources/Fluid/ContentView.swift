@@ -138,6 +138,7 @@ struct ContentView: View {
     @State private var promptModeOverrideText: String? // System prompt text to use when in prompt mode
     @State private var activeDictationShortcutSlot: SettingsStore.DictationShortcutSlot? = nil
     @State private var activeRecordingMode: ActiveRecordingMode = .none
+    @State private var pendingAIReprocessText: String? = nil
     @State private var activeShortcutRecordingTarget: ShortcutRecordingTarget? = nil
     @State private var currentRecordingModifierKeyCodes: Set<UInt16> = []
     @State private var pendingModifierKeyCodes: Set<UInt16> = []
@@ -2038,7 +2039,10 @@ struct ContentView: View {
         }
         let shouldShowAIProcessingFailure = shouldPersistOutputs && aiFallbackReason != nil
         if shouldShowAIProcessingFailure {
+            self.pendingAIReprocessText = transcribedText
             NotchContentState.shared.showAIProcessingFailure()
+        } else {
+            self.pendingAIReprocessText = nil
         }
 
         // When FluidVoice itself is frontmost, the bound editor already receives `finalText`.
@@ -2172,7 +2176,17 @@ struct ContentView: View {
         return .normal
     }
 
-    private func reprocessLastDictationFromHistory() {
+    private func reprocessLastDictation() {
+        if let pendingText = self.pendingAIReprocessText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !pendingText.isEmpty
+        {
+            DebugLogger.shared.info("Actions: Reprocessing pending failed dictation", source: "ContentView")
+            Task { @MainActor in
+                await self.reprocessDictationText(pendingText)
+            }
+            return
+        }
+
         guard let last = TranscriptionHistoryStore.shared.entries.first else {
             DebugLogger.shared.info("Actions: Reprocess requested but history is empty", source: "ContentView")
             return
@@ -2326,7 +2340,10 @@ struct ContentView: View {
             )
         }
         if aiFallbackReason != nil {
+            self.pendingAIReprocessText = transcribedText
             NotchContentState.shared.showAIProcessingFailure()
+        } else {
+            self.pendingAIReprocessText = nil
         }
 
         if SettingsStore.shared.copyTranscriptionToClipboard {
@@ -2658,7 +2675,7 @@ struct ContentView: View {
             self.handleLiveOverlayModeSwitch(mode)
         }
         NotchContentState.shared.onReprocessLastRequested = {
-            self.reprocessLastDictationFromHistory()
+            self.reprocessLastDictation()
         }
         NotchContentState.shared.onCopyLastRequested = {
             self.copyLastDictationFromHistory()
