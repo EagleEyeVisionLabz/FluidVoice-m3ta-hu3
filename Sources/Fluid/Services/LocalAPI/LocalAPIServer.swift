@@ -150,10 +150,13 @@ private final class LocalAPIConnectionHandler {
                     return
                 }
 
-                if let request = self.parseRequestIfComplete() {
+                switch self.parseRequestIfComplete() {
+                case let .request(request):
                     let response = await self.router.route(request)
                     self.send(response)
-                } else {
+                case let .failure(response):
+                    self.send(response)
+                case .incomplete:
                     self.receive()
                 }
             }
@@ -189,21 +192,27 @@ private final class LocalAPIConnectionHandler {
         self.onClose?()
     }
 
-    private func parseRequestIfComplete() -> LocalAPI.Request? {
+    private enum ParsedRequest {
+        case incomplete
+        case request(LocalAPI.Request)
+        case failure(LocalAPI.Response)
+    }
+
+    private func parseRequestIfComplete() -> ParsedRequest {
         guard let headerEnd = self.buffer.range(of: Data("\r\n\r\n".utf8)) else {
-            return nil
+            return .incomplete
         }
 
         let headerData = self.buffer[..<headerEnd.lowerBound]
         guard let headerText = String(data: headerData, encoding: .utf8) else {
-            return LocalAPI.Request(method: "", path: "", query: [:], headers: [:], body: Data())
+            return .failure(LocalAPI.error("Malformed request.", status: 400))
         }
 
         let lines = headerText.components(separatedBy: "\r\n")
-        guard let requestLine = lines.first else { return nil }
+        guard let requestLine = lines.first else { return .incomplete }
         let parts = requestLine.split(separator: " ", maxSplits: 2).map(String.init)
         guard parts.count >= 2 else {
-            return LocalAPI.Request(method: "", path: "", query: [:], headers: [:], body: Data())
+            return .failure(LocalAPI.error("Malformed request.", status: 400))
         }
 
         var headers: [String: String] = [:]
@@ -214,21 +223,37 @@ private final class LocalAPIConnectionHandler {
             headers[key] = value
         }
 
-        let contentLength = Int(headers["content-length"] ?? "0") ?? 0
-        let bodyStart = headerEnd.upperBound
-        guard self.buffer.count >= bodyStart + contentLength else {
-            return nil
+        let contentLength: Int
+        if let rawContentLength = headers["content-length"] {
+            guard let parsedContentLength = Int(rawContentLength), parsedContentLength >= 0 else {
+                return .failure(LocalAPI.error("Invalid Content-Length.", status: 400))
+            }
+            guard parsedContentLength <= LocalAPI.maxRequestBytes else {
+                return .failure(LocalAPI.error("Request too large.", status: 413))
+            }
+            contentLength = parsedContentLength
+        } else {
+            contentLength = 0
         }
 
-        let body = Data(self.buffer[bodyStart..<(bodyStart + contentLength)])
+        let bodyStart = headerEnd.upperBound
+        let requestEnd = bodyStart + contentLength
+        guard requestEnd <= LocalAPI.maxRequestBytes else {
+            return .failure(LocalAPI.error("Request too large.", status: 413))
+        }
+        guard self.buffer.count >= requestEnd else {
+            return .incomplete
+        }
+
+        let body = Data(self.buffer[bodyStart..<requestEnd])
         let parsedTarget = Self.parseTarget(parts[1])
-        return LocalAPI.Request(
+        return .request(LocalAPI.Request(
             method: parts[0].uppercased(),
             path: parsedTarget.path,
             query: parsedTarget.query,
             headers: headers,
             body: body
-        )
+        ))
     }
 
     private static func parseTarget(_ target: String) -> (path: String, query: [String: String]) {

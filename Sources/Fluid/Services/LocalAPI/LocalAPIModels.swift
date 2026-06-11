@@ -12,7 +12,7 @@ enum LocalAPI {
             let defaults = UserDefaults.standard
             let enabled: Bool
             if defaults.object(forKey: "LocalAPIEnabled") == nil {
-                enabled = true
+                enabled = false
             } else {
                 enabled = defaults.bool(forKey: "LocalAPIEnabled")
             }
