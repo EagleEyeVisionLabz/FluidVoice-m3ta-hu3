@@ -309,11 +309,19 @@ final class TranscriptionHistoryStore: ObservableObject {
         guard currentBytes > budgetBytes else { return 0 }
 
         var updatedEntries = self.entries
+        let referencedFileNames = Set(updatedEntries.compactMap { $0.audio?.fileName })
+        let orphanedAudio = DictationAudioHistoryStore.shared.deleteUnreferencedAudioFiles(referencedFileNames: referencedFileNames)
+        if orphanedAudio.fileCount > 0 {
+            currentBytes = max(0, currentBytes - orphanedAudio.byteCount)
+            DebugLogger.shared.info("Pruned orphaned dictation audio (\(orphanedAudio.fileCount) files)", source: "TranscriptionHistoryStore")
+        }
+        guard currentBytes > budgetBytes else { return 0 }
+
         var prunedCount = 0
         for index in updatedEntries.indices.reversed() {
             guard let audio = updatedEntries[index].audio else { continue }
-            DictationAudioHistoryStore.shared.deleteAudio(fileName: audio.fileName)
-            currentBytes -= Int64(audio.byteCount)
+            let removedBytes = DictationAudioHistoryStore.shared.deleteAudio(fileName: audio.fileName)
+            currentBytes = max(0, currentBytes - removedBytes)
             updatedEntries[index] = updatedEntries[index].replacingAudio(nil)
             prunedCount += 1
             if currentBytes <= budgetBytes {

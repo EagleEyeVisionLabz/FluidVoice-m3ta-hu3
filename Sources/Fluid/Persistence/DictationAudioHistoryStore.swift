@@ -82,11 +82,51 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         return self.fileManager.fileExists(atPath: url.path)
     }
 
-    func deleteAudio(fileName: String) {
+    @discardableResult
+    func deleteAudio(fileName: String) -> Int64 {
         guard let url = try? self.audioDirectory(createIfNeeded: false).appendingPathComponent(fileName, isDirectory: false) else {
-            return
+            return 0
         }
-        try? self.fileManager.removeItem(at: url)
+
+        return self.deleteAudioFile(at: url) ?? 0
+    }
+
+    func deleteUnreferencedAudioFiles(referencedFileNames: Set<String>) -> (fileCount: Int, byteCount: Int64) {
+        guard let directory = try? self.audioDirectory(createIfNeeded: false),
+              self.fileManager.fileExists(atPath: directory.path)
+        else {
+            return (0, 0)
+        }
+
+        let files = (try? self.fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+
+        var fileCount = 0
+        var byteCount: Int64 = 0
+        for file in files where file.pathExtension.lowercased() == "wav" && !referencedFileNames.contains(file.lastPathComponent) {
+            guard let removedBytes = self.deleteAudioFile(at: file) else { continue }
+            fileCount += 1
+            byteCount += removedBytes
+        }
+
+        return (fileCount, byteCount)
+    }
+
+    private func deleteAudioFile(at url: URL) -> Int64? {
+        guard self.fileManager.fileExists(atPath: url.path) else {
+            return nil
+        }
+
+        let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+        do {
+            try self.fileManager.removeItem(at: url)
+            return fileSize
+        } catch {
+            return nil
+        }
     }
 
     func deleteAllAudioFiles() {
