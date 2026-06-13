@@ -2784,7 +2784,7 @@ struct BottomOverlayView: View {
 
                     if self.isPillSize {
                         // Glossy border: a bright highlight that slowly rotates around the edge.
-                        TimelineView(.animation) { timeline in
+                        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                             let seconds = timeline.date.timeIntervalSinceReferenceDate
                             let angle = (seconds.truncatingRemainder(dividingBy: 6.0) / 6.0) * 360.0
                             RoundedRectangle(cornerRadius: self.layout.cornerRadius)
