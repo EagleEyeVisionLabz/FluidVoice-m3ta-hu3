@@ -923,9 +923,9 @@ struct OnboardingFlowView: View {
 
     private var landingStep: some View {
         GeometryReader { proxy in
-            ScrollView {
-                let landing = self.theme.metrics.onboardingSurface.landing
+            let landing = self.theme.metrics.onboardingSurface.landing
 
+            ZStack {
                 VStack(alignment: .center, spacing: self.theme.metrics.onboardingSurface.landing.sectionSpacing) {
                     FluidOnboardingLandingHero(
                         eyebrow: "",
@@ -934,11 +934,13 @@ struct OnboardingFlowView: View {
                         firstDetail: "Accurate. Fast. Private. Free.",
                         secondDetail: "Built for creators, thinkers, and builders."
                     ) {
-                        Button("Next") {
+                        FluidOnboardingLandingPrimaryButton(title: "Next") {
                             self.goNext()
                         }
-                        .fluidOnboardingGlowButton(controlSize: .large)
-                        .keyboardShortcut(.defaultAction)
+                        .frame(
+                            width: FluidOnboardingLandingPrimaryButton.size.width,
+                            height: FluidOnboardingLandingPrimaryButton.size.height
+                        )
                     }
                 }
                 .frame(width: landing.contentWidth, alignment: .center)
@@ -947,16 +949,18 @@ struct OnboardingFlowView: View {
                 .offset(y: -78)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 24)
-            }
-            .defaultScrollAnchor(.center)
-            .contentShape(Rectangle())
-            .onContinuousHover { phase in
-                switch phase {
-                case let .active(location):
-                    self.updateLandingGlow(location: location, in: proxy.size)
-                case .ended:
-                    self.resetLandingGlow()
-                }
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+                .zIndex(-1)
             }
             .background {
                 FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)

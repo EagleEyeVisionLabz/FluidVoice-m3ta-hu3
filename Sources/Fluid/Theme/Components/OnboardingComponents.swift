@@ -113,6 +113,217 @@ struct FluidOnboardingLandingBackdrop: View {
     }
 }
 
+struct FluidOnboardingLandingHoverTracker: NSViewRepresentable {
+    let onMove: (CGPoint, CGSize) -> Void
+    let onExit: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onMove: self.onMove, onExit: self.onExit)
+    }
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ view: TrackingView, context: Context) {
+        context.coordinator.onMove = self.onMove
+        context.coordinator.onExit = self.onExit
+        view.coordinator = context.coordinator
+    }
+
+    final class Coordinator {
+        var onMove: (CGPoint, CGSize) -> Void
+        var onExit: () -> Void
+
+        init(onMove: @escaping (CGPoint, CGSize) -> Void, onExit: @escaping () -> Void) {
+            self.onMove = onMove
+            self.onExit = onExit
+        }
+    }
+
+    final class TrackingView: NSView {
+        weak var coordinator: Coordinator?
+        private var trackingArea: NSTrackingArea?
+
+        override var isFlipped: Bool { true }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            nil
+        }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+
+            if let trackingArea {
+                self.removeTrackingArea(trackingArea)
+            }
+
+            let options: NSTrackingArea.Options = [
+                .activeInKeyWindow,
+                .inVisibleRect,
+                .mouseEnteredAndExited,
+                .mouseMoved,
+            ]
+            let trackingArea = NSTrackingArea(rect: .zero, options: options, owner: self)
+            self.addTrackingArea(trackingArea)
+            self.trackingArea = trackingArea
+        }
+
+        override func mouseEntered(with event: NSEvent) {
+            self.report(event)
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            self.report(event)
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            self.coordinator?.onExit()
+        }
+
+        private func report(_ event: NSEvent) {
+            let location = self.convert(event.locationInWindow, from: nil)
+            self.coordinator?.onMove(location, self.bounds.size)
+        }
+    }
+}
+
+struct FluidOnboardingLandingPrimaryButton: NSViewRepresentable {
+    static let size = CGSize(width: 236, height: 56)
+
+    let title: String
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: self.action)
+    }
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = LandingPrimaryNSButton()
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.performAction)
+        button.setButtonType(.momentaryPushIn)
+        button.isBordered = false
+        button.wantsLayer = true
+        button.focusRingType = .none
+        button.keyEquivalent = "\r"
+        button.keyEquivalentModifierMask = []
+        button.setAccessibilityLabel(self.title)
+        button.update(title: self.title, isHighlighted: false)
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.action = self.action
+
+        guard let button = button as? LandingPrimaryNSButton else {
+            button.title = self.title
+            button.setAccessibilityLabel(self.title)
+            return
+        }
+
+        button.setAccessibilityLabel(self.title)
+        button.update(title: self.title, isHighlighted: button.isHighlighted)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func performAction() {
+            self.action()
+        }
+    }
+}
+
+private final class LandingPrimaryNSButton: NSButton {
+    private static let normalColor = NSColor(srgbRed: 0.16, green: 0.49, blue: 1.0, alpha: 1.0)
+    private static let highlightedColor = NSColor(srgbRed: 0.10, green: 0.40, blue: 0.92, alpha: 1.0)
+    private static let hoverColor = NSColor(srgbRed: 0.20, green: 0.54, blue: 1.0, alpha: 1.0)
+    private var trackingArea: NSTrackingArea?
+    private var isHovering = false
+
+    override var isHighlighted: Bool {
+        didSet {
+            self.update(title: self.title, isHighlighted: self.isHighlighted)
+        }
+    }
+
+    override var intrinsicContentSize: NSSize {
+        FluidOnboardingLandingPrimaryButton.size
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard self.isEnabled, !self.isHidden, self.alphaValue > 0, self.bounds.contains(point) else {
+            return nil
+        }
+
+        return self
+    }
+
+    override func layout() {
+        super.layout()
+        self.layer?.cornerRadius = self.bounds.height / 2
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+
+        if let trackingArea {
+            self.removeTrackingArea(trackingArea)
+        }
+
+        let options: NSTrackingArea.Options = [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect]
+        let trackingArea = NSTrackingArea(rect: .zero, options: options, owner: self)
+        self.addTrackingArea(trackingArea)
+        self.trackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        self.isHovering = true
+        self.update(title: self.title, isHighlighted: self.isHighlighted)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        self.isHovering = false
+        self.update(title: self.title, isHighlighted: self.isHighlighted)
+    }
+
+    func update(title: String, isHighlighted: Bool) {
+        self.title = title
+        self.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 18, weight: .semibold),
+                .foregroundColor: NSColor.white,
+            ]
+        )
+        self.alignment = .center
+        self.layer?.masksToBounds = false
+        self.layer?.backgroundColor = self.backgroundColor(isHighlighted: isHighlighted).cgColor
+        self.layer?.cornerRadius = self.bounds.height > 0 ? self.bounds.height / 2 : 28
+        self.layer?.shadowColor = Self.normalColor.withAlphaComponent(0.34).cgColor
+        self.layer?.shadowOpacity = isHighlighted ? 0.20 : 0.34
+        self.layer?.shadowRadius = isHighlighted ? 8 : 14
+        self.layer?.shadowOffset = NSSize(width: 0, height: isHighlighted ? 4 : 7)
+    }
+
+    private func backgroundColor(isHighlighted: Bool) -> NSColor {
+        if isHighlighted {
+            return Self.highlightedColor
+        }
+
+        return self.isHovering ? Self.hoverColor : Self.normalColor
+    }
+}
+
 private struct FluidOnboardingAppIconMark: View {
     private static let appIconImage: NSImage = NSApplication.shared.applicationIconImage
         ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
@@ -175,8 +386,6 @@ private struct FluidOnboardingPortalGlow: View {
 
 private enum FluidOnboardingLandingColors {
     static let blue = Color(red: 0.10, green: 0.46, blue: 1.0)
-    static let buttonBlue = Color(red: 0.08, green: 0.43, blue: 1.0)
-    static let buttonBlueHighlight = Color(red: 0.24, green: 0.58, blue: 1.0)
 }
 
 private struct OnboardingSelectableSurfaceModifier: ViewModifier {
@@ -251,53 +460,6 @@ private struct OnboardingProminentButtonModifier: ViewModifier {
     }
 }
 
-private struct OnboardingGlowButtonModifier: ViewModifier {
-    @Environment(\.theme) private var theme
-    @State private var isHovered = false
-
-    let controlSize: ControlSize?
-
-    func body(content: Content) -> some View {
-        let isLarge = self.controlSize == .large
-
-        content
-            .font(.system(size: isLarge ? 18 : 14, weight: .semibold))
-            .foregroundStyle(Color.white)
-            .padding(.horizontal, isLarge ? 52 : 24)
-            .padding(.vertical, isLarge ? 15 : 9)
-            .frame(minWidth: isLarge ? 236 : 0)
-            .background(
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                FluidOnboardingLandingColors.buttonBlueHighlight,
-                                FluidOnboardingLandingColors.buttonBlue,
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(
-                        color: FluidOnboardingLandingColors.blue.opacity(self.isHovered ? 0.56 : 0.34),
-                        radius: self.isHovered ? 24 : 16,
-                        x: 0,
-                        y: 8
-                    )
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.24), lineWidth: 1)
-            )
-            .contentShape(Capsule())
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                self.isHovered = hovering
-            }
-            .animation(.easeOut(duration: 0.16), value: self.isHovered)
-    }
-}
-
 private struct OnboardingSecondaryButtonModifier: ViewModifier {
     let controlSize: ControlSize?
 
@@ -335,10 +497,6 @@ extension View {
 
     func fluidOnboardingProminentButton(controlSize: ControlSize? = nil) -> some View {
         self.modifier(OnboardingProminentButtonModifier(controlSize: controlSize))
-    }
-
-    func fluidOnboardingGlowButton(controlSize: ControlSize? = nil) -> some View {
-        self.modifier(OnboardingGlowButtonModifier(controlSize: controlSize))
     }
 
     func fluidOnboardingSecondaryButton(controlSize: ControlSize? = nil) -> some View {
