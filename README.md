@@ -45,6 +45,30 @@ We're keeping Fluid Intelligence private for now so we can sustainably offer the
 
 ---
 
+## Fluid Intelligence in Action
+
+### Email Template
+
+https://github.com/user-attachments/assets/6c7a7c4c-17a8-453d-8eff-1aa1fa9f6077
+
+### Flowers
+
+https://github.com/user-attachments/assets/36747e9d-1ea3-4d27-8d38-eaacb6d57285
+
+### Change Time & Name
+
+https://github.com/user-attachments/assets/04e00f3d-a602-448d-9bde-50b5e8f61ac6
+
+### Emoji
+
+https://github.com/user-attachments/assets/5f6063ab-0506-4687-b825-c7bf4ab66ed6
+
+### Hyphens & Numbers
+
+https://github.com/user-attachments/assets/47175f2b-9f06-452e-b892-42488e4ba536
+
+---
+
 ## Demo
 
 ### Command Mode — Take any action on your Mac using FluidVoice
