@@ -277,7 +277,7 @@ final class DictationE2ETests: XCTestCase {
             {
               "text": "FluidVoice",
               "aliases": ["fluid voice"],
-              "weight": 10.0
+              "weight": 13.0
             },
             {
               "text": "GEMBA-E"
