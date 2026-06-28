@@ -15,7 +15,7 @@ Open source voice-to-text dictation app for macOS with on-device AI enhancement.
 
 ## Support FluidVoice
 
-If FluidVoice makes your day a little easier, you can support its continued development on [Ko-fi](https://ko-fi.com/alticdev).
+If FluidVoice makes your day a little easier, you can support its continued development on [GitHub Sponsors](https://github.com/sponsors/altic-dev).
 
 ---
 
