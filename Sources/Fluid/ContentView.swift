@@ -2528,6 +2528,17 @@ struct ContentView: View {
         }
 
         Task { @MainActor in
+            // Only one paste may be pending at a time. Because the paste waits for the modifier keys
+            // to release, a quick double/triple-tap of the chord would otherwise queue several Tasks
+            // that all insert at once on release. This collapses them to a single paste while still
+            // allowing a deliberate repeat (press, it lands, then press again).
+            guard !Self.isPasteLastInProgress else {
+                DebugLogger.shared.info("Actions: Paste skipped - a paste is already pending", source: "ContentView")
+                return
+            }
+            Self.isPasteLastInProgress = true
+            defer { Self.isPasteLastInProgress = false }
+
             // The hotkey fires on key-down while its own modifier keys (e.g. ⌘⌃) are still
             // physically held. Synthesizing text in that state makes the target app treat the
             // characters as keyboard shortcuts and drop them, so the paste lands once the keys are
@@ -2558,6 +2569,12 @@ struct ContentView: View {
             DebugLogger.shared.info("Actions: Pasted latest transcription into focused field", source: "ContentView")
         }
     }
+
+    /// Guards against overlapping paste insertions: only one "paste last transcription" may be
+    /// pending at a time (see pasteLastDictationFromHistory). A rapid re-tap while one is still
+    /// waiting for the modifier keys to release is ignored rather than queuing a duplicate insert.
+    /// Only ever touched on the main actor.
+    private static var isPasteLastInProgress = false
 
     /// Polls until the keyboard modifier keys are released, returning `true` once they are, or
     /// `false` if the timeout elapses with keys still held. Used before synthesizing a paste so the
